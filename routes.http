@@ -1,0 +1,26 @@
+GET http://localhost:3333/account?cpf=42
+
+###
+
+POST http://localhost:3333/account
+Content-Type: application/json
+
+{
+    "cpf": "42432432",
+    "name": "Giuseppe"
+}
+
+###
+
+PUT http://localhost:3333/account/54633ff0-6bef-4ec1-a46e-3d45016ffca3
+Content-Type: application/json
+
+{
+    "cpf": "99999999",
+    "name": "Batman"
+}
+
+
+###
+
+DELETE http://localhost:3333/account/
