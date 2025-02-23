@@ -152,7 +152,7 @@ app.post(
 
     customer?.statement.push(operation);
     if (customer) {
-      customer.balance = balance;
+      customer.balance -= amount;
     }
     return res.status(201).send();
   }
