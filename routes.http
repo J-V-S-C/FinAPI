@@ -1,22 +1,50 @@
-GET http://localhost:3333/account?cpf=42432432
+GET http://localhost:3333/customers
 
+###
+
+GET http://localhost:3333/statement
+cpf: 289
+
+###
+
+GET http://localhost:3333/statement/date?date=2025-02-23
+cpf: 289
 ###
 
 POST http://localhost:3333/account
 Content-Type: application/json
 
 {
-    "cpf": "42432432",
-    "name": "Giuseppe"
+    "cpf": "99999999",
+    "name": "Orotio"
 }
 
 ###
 
-PUT http://localhost:3333/account/54633ff0-6bef-4ec1-a46e-3d45016ffca3
+POST http://localhost:3333/deposit
+cpf: 289
 Content-Type: application/json
 
 {
-    "cpf": "99999999",
+    "description": "Recheada",
+    "amount": 400.00
+}
+###
+
+POST http://localhost:3333/withdraw
+cpf: 289
+Content-Type: application/json
+
+{
+    "amount": 400.00
+}
+###
+
+PUT http://localhost:3333/account/
+cpf: 289
+Content-Type: application/json
+
+{
     "name": "Batman"
 }
 
@@ -24,3 +52,4 @@ Content-Type: application/json
 ###
 
 DELETE http://localhost:3333/account/
+cpf: 1

@@ -1,5 +1,4 @@
-import { error } from "console";
-import express, { Request, response, Response } from "express";
+import express, { NextFunction, Request, Response } from "express";
 import { v4 as uuidv4 } from "uuid";
 
 const app = express();
@@ -9,32 +8,94 @@ interface Customer {
   cpf: string;
   name: string;
   id: string;
-  statement: any[];
+  statement: statementOperation[];
+  balance: number;
+}
+
+interface CustomRequest extends Request {
+  customer?: Customer;
+}
+
+interface statementOperation {
+  description?: string;
+  amount: number;
+  created_at: Date;
+  type: "credit" | "debit";
 }
 
 let customers: Customer[] = [];
 
-app.get("/account", (req: Request, res: Response) => {
-  const { cpf } = req.query;
-  if (cpf) {
-    const customer = customers.find((customer) => customer.cpf === cpf);
+function verifyIfExistsAccountCPF(
+  req: CustomRequest,
+  res: Response,
+  next: NextFunction
+) {
+  const { cpf } = req.headers;
 
-    if (!customer) {
-      return res.status(404).json({ error: "Customer not found!" });
-    }
-    return res.json(customer.statement);
+  const customer = customers.find((customer) => customer.cpf === cpf);
+  if (!customer) {
+    return res.status(404).json({ error: "Customer not found!" });
   }
+  req.customer = customer;
 
-  if (customers.length === 0)
-    return res
-      .status(404)
-      .json({ message: "There are no customers registered" });
+  return next();
+}
 
+function getBalance(statement?: statementOperation[]) {
+  return statement?.reduce((acc, operation) => {
+    return operation.type === "credit"
+      ? acc + operation.amount
+      : acc - operation.amount;
+  }, 0);
+}
+
+app.get("/customers", (req: Request, res: Response) => {
+  if (customers.length === 0) {
+    return res.status(404).json({ error: "There are no customers yet" });
+  }
   return res.json(customers);
 });
 
+app.get(
+  "/statement",
+  verifyIfExistsAccountCPF,
+  (req: CustomRequest, res: Response) => {
+    const { customer } = req;
+
+    return res.json(customer?.statement);
+  }
+);
+
+app.get(
+  "/statement/date",
+  verifyIfExistsAccountCPF,
+  (req: CustomRequest, res: Response) => {
+    const { customer } = req;
+    const { date } = req.query;
+
+    if (!date) {
+      return res
+        .status(400)
+        .json({ error: "Date is required in query params!" });
+    }
+
+    const dateFormat = new Date(date + " 00:00");
+    if (isNaN(dateFormat.getTime())) {
+      return res.status(400).json({ error: "Invalid date format!" });
+    }
+
+    const statement = customer?.statement.filter((statement) => {
+      const operationDate = new Date(statement.created_at).toDateString();
+      return operationDate === dateFormat.toDateString();
+    });
+
+    return res.json(statement);
+  }
+);
+
 app.post("/account", (req: Request, res: Response) => {
   const { cpf, name } = req.body;
+  let index = 0;
 
   const customerAlreadyExists = customers.some(
     (customers) => customers.cpf === cpf
@@ -44,36 +105,80 @@ app.post("/account", (req: Request, res: Response) => {
     return res.status(400).json({ error: "Customer already exists!" });
   }
 
-  customers.push({ cpf, name, id: uuidv4(), statement: [] });
+  customers.push({ cpf, name, id: uuidv4(), statement: [], balance: 0 });
 
   return res.status(201).send();
 });
 
-app.put("/account/:id", (req: Request, res: Response) => {
-  const { id } = req.params;
-  const { name, cpf } = req.body;
-  const customer = customers.find((customer) => customer.id === id);
+app.post(
+  "/deposit",
+  verifyIfExistsAccountCPF,
+  (req: CustomRequest, res: Response) => {
+    const { description, amount } = req.body;
+    const { customer } = req;
 
-  if (!customer) {
-    return res.status(404).json({ error: "Customer not found!" });
+    const operation: statementOperation = {
+      description: description,
+      amount: amount,
+      created_at: new Date(),
+      type: "credit",
+    };
+
+    customer?.statement.push(operation);
+    if (customer) {
+      customer.balance += amount;
+    }
+    return res.status(201).send();
   }
+);
 
-  customer.name = name;
-  customer.cpf = cpf;
+app.post(
+  "/withdraw",
+  verifyIfExistsAccountCPF,
+  (req: CustomRequest, res: Response) => {
+    const { amount } = req.body;
+    const { customer } = req;
+    const balance = getBalance(customer?.statement) || 0;
 
-  return res.status(201).json({ message: "Customer updated with success!" });
-});
+    if (balance < amount) {
+      return res.status(400).json({ error: "Insuficient funds!" });
+    }
 
-app.delete("/account/:id", (req: Request, res: Response) => {
-  const { id } = req.params;
+    const operation: statementOperation = {
+      amount: amount,
+      created_at: new Date(),
+      type: "debit",
+    };
 
-  const customer = customers.find((customer) => customer.id === id);
-  if (!customer) {
-    return res.status(404).json({ error: "Customer not found!" });
+    customer?.statement.push(operation);
+    if (customer) {
+      customer.balance = balance;
+    }
+    return res.status(201).send();
   }
-  customers = customers.filter((customer) => customer.id !== id);
+);
 
-  return res.status(201).json({ message: "There are no customers registered" });
-});
+app.put(
+  "/account",
+  verifyIfExistsAccountCPF,
+  (req: CustomRequest, res: Response) => {
+    const { name } = req.body;
+    const { customer } = req;
+
+    if (customer) customer.name = name;
+    return res.status(201).send();
+  }
+);
+
+app.delete(
+  "/account",
+  verifyIfExistsAccountCPF,
+  (req: CustomRequest, res: Response) => {
+    const { customer } = req;
+
+    customers = customers.filter((c) => c.id !== customer?.id);
+    return res.status(200).json(customers);
+  }
+);
 
 app.listen(3333, () => console.log("🚀 Server is running"));
