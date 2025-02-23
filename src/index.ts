@@ -22,7 +22,7 @@ app.get("/account", (req: Request, res: Response) => {
     if (!customer) {
       return res.status(404).json({ error: "Customer not found!" });
     }
-    return res.status(200).json(customer);
+    return res.json(customer.statement);
   }
 
   if (customers.length === 0)
@@ -30,7 +30,7 @@ app.get("/account", (req: Request, res: Response) => {
       .status(404)
       .json({ message: "There are no customers registered" });
 
-  return res.status(200).json(customers);
+  return res.json(customers);
 });
 
 app.post("/account", (req: Request, res: Response) => {
